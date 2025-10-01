@@ -1,0 +1,23 @@
+# Virtual environments
+venv/
+.venv/
+venv
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Django database
+db.sqlite3
+*.log
+
+# VS Code settings
+.vscode/
+
+# Environment files
+.env
+*.env
+
+# Migrations cache (not actual migration files)
+*/migrations/__pycache__/
+.gitignore
