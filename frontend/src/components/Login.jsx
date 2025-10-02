@@ -3,11 +3,9 @@ import React from 'react'
 import { useState } from 'react'
 import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate } from 'react-router-dom'
-
-const Signup = () => {
+const Login = () => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
-        FullName: "",
         Email: "",
         Password: ""
     })
@@ -19,7 +17,7 @@ const Signup = () => {
 
         e.preventDefault();
         try {
-            const response = await fetch("http://127.0.0.1:8000/api/signup/", {
+            const response = await fetch("http://127.0.0.1:8000/api/login/", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -27,10 +25,11 @@ const Signup = () => {
                 body: JSON.stringify(formData)
             });
 
-
-
-            if (response.status === 201) {
-                toast.success("Signup successful! Redirecting to login...");
+            const data = await response.json();
+            if (response.status === 200) {
+                toast.success("Login successful! Redirecting to login...");
+                localStorage.setItem('userId', data.userId);
+                localStorage.setItem('userName', data.userName);
 
                 setTimeout(() => {
                     navigate('/login');
@@ -46,30 +45,18 @@ const Signup = () => {
 
 
             console.error("Error during signup:", error);
-            toast.error("An error occurred during signup. Please try again later.");
+            toast.error("An error occurred during login. Please try again later.");
         }
 
     }
-
     return (
         <div className="container mt-5">
             <div className="text-center mb-4">
-                <h2> <i className='fas fa-user-plus me-2'></i>Sign up </h2>
-                <p>Create your account to start tracking expenses</p>
+                <h2> <i className='fas fa-user-plus me-2'></i> Log In </h2>
+                <p>Login to Access your dashboard</p>
             </div>
 
             <form className='p-4 rounded shadow mx-auto' style={{ maxWidth: "500px" }} onSubmit={handleSubmit}>
-                <div className='mb-3'>
-                    <label className='form-label'>Full Name</label>
-                    <div className='input-group'>
-                        <span className='input-group-text'>
-                            <i className='fas fa-user'></i>
-                        </span>
-                        <input type="text" name="FullName" className='form-control' placeholder='Enter your full name' onChange={handleChange} value={formData.FullName} />
-                    </div>
-
-                </div>
-
                 <div className='mb-3'>
                     <label className='form-label'>Email</label>
                     <div className='input-group'>
@@ -93,11 +80,11 @@ const Signup = () => {
                 </div>
 
 
-                <button type="submit" className='btn btn-primary w-100 mt-3'> <i className='fas fa-user-plus me-2'></i>Sign up</button>
+                <button type="submit" className='btn btn-primary w-100 mt-3'> <i className='fas fa-user-plus me-2'></i>Log In</button>
             </form>
             <ToastContainer />
 
         </div>
     )
 }
-export default Signup
+export default Login
