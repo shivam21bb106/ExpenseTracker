@@ -32,3 +32,20 @@ def login(request):
         except UserDetail.DoesNotExist:
             print("Login failed for email:", email)
             return HttpResponse({"message":"Invalid credentials"}, status=400)
+        
+@csrf_exempt
+def add_expense(request):
+    if request.method =="POST":
+        data = json.loads(request.body)
+        user_id = data.get("UserId")
+        expense_date = data.get("ExpenseDate")
+        expense_item = data.get("ExpenseItem")
+        expense_cost = data.get("ExpenseCost")
+        
+        user = UserDetail.objects.get(id=user_id)
+        try:
+            Expense.objects.create(UserId=user, ExpenseDate=expense_date, ExpenseItem=expense_item, ExpenseCost=expense_cost)
+            return JsonResponse({"message":"Expense Added Successfully"}, status=201)
+        except Exception as e:
+            return JsonResponse({"message":"Something went wrong",'error':str(e)}, status=400)
+        

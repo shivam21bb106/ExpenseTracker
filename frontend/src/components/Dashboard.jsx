@@ -1,7 +1,19 @@
 import React from 'react'
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const Dashboard = () => {
     const userName = localStorage.getItem("userName")
+
+
+
+    const userid = localStorage.getItem("userId")
+
+    useEffect(() => {
+        if (!userid) {
+            navigate('/login')
+        }
+    }, [])
     return (
         <div children='container mt-4'>
             <div className='text-center'>
