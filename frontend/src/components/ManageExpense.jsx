@@ -12,33 +12,89 @@ const ManageExpense = () => {
     const [editExpense, setEditExpense] = useState(null);
     const [saving, setSaving] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
+    const [search, setSearch] = useState("");
+
+
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [total, setTotal] = useState(0);
+
 
     useEffect(() => {
         if (!userid) {
             navigate("/login");
             return;
         }
-        fetchExpenses();
+        fetchExpenses("", 1);
 
     }, []);
 
-    const fetchExpenses = async () => {
+    const fetchExpenses = async (searchQuery = "", pageToLoad = 1, pageSizeParam = pageSize) => {
         setLoading(true);
         try {
-            const r = await fetch(`http://127.0.0.1:8000/api/manage_expense/${userid}/`);
-            if (!r.ok) throw new Error(`Failed to fetch (${r.status})`);
-            const data = await r.json();
-            const normalized = Array.isArray(data)
-                ? data.map((it) => ({ ...it, ExpenseDate: (it.ExpenseDate || "").split("T")[0] }))
-                : [];
+            let url = `https://shivam21bbbb.pythonanywhere.com/api/manage_expense/${userid}/?page=${pageToLoad}&page_size=${pageSizeParam}`;
+            if (searchQuery && searchQuery.trim()) {
+                url += `&q=${encodeURIComponent(searchQuery.trim())}`;
+            }
+
+            console.info("Fetching:", url);
+            const r = await fetch(url);
+
+            if (!r.ok) {
+                const txt = await r.text().catch(() => "");
+                console.error("Fetch failed:", r.status, txt);
+                throw new Error(`Failed to fetch (${r.status})`);
+            }
+
+            const data = await r.json().catch(() => null);
+            console.info("API response:", data);
+
+            let items = [];
+            let count = 0;
+            let pageNum = pageToLoad;
+            let pageSz = pageSizeParam;
+
+            if (Array.isArray(data)) {
+                items = data;
+                count = data.length;
+                pageNum = pageToLoad;
+                pageSz = pageSizeParam;
+            } else if (data && typeof data === "object") {
+                items = Array.isArray(data.results) ? data.results : [];
+                count = Number(data.count || items.length || 0);
+                pageNum = Number(data.page || pageToLoad);
+                pageSz = Number(data.page_size || pageSizeParam);
+            } else {
+                console.warn("Unexpected API response shape, using empty list.");
+                items = [];
+                count = 0;
+            }
+
+            const normalized = items.map((it) => ({
+                ...it,
+                ExpenseDate: it?.ExpenseDate ? String(it.ExpenseDate).split("T")[0] : "",
+            }));
+
             setExpenses(normalized);
+            setTotal(count);
+            setPage(pageNum);
+            setPageSize(pageSz);
+
+            if (normalized.length === 0 && count > 0 && pageNum > 1) {
+                console.info("Current page empty — fetching first page");
+                fetchExpenses(searchQuery, 1, pageSz);
+            }
         } catch (err) {
-            console.error(err);
-            toast.error("Failed to load expenses");
+            console.error("fetchExpenses error:", err);
+            toast.error("Failed to load expenses — check console/network");
+            setExpenses([]);
+            setTotal(0);
         } finally {
             setLoading(false);
         }
     };
+
+
 
     const handleEdit = (expense) => {
         setEditExpense({ ...expense });
@@ -69,7 +125,7 @@ const ManageExpense = () => {
         };
 
         try {
-            const r = await fetch(`http://127.0.0.1:8000/api/edit_expense/${editExpense.id}/`, {
+            const r = await fetch(`https://shivam21bbbb.pythonanywhere.com/api/edit_expense/${editExpense.id}/`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -94,7 +150,7 @@ const ManageExpense = () => {
         if (!window.confirm("Are you sure you want to delete this expense?")) return;
         setDeletingId(expenseId);
         try {
-            const r = await fetch(`http://127.0.0.1:8000/api/edit_expense/${expenseId}/`, {
+            const r = await fetch(`https://shivam21bbbb.pythonanywhere.com/api/edit_expense/${expenseId}/`, {
                 method: "DELETE",
             });
             if (!r.ok) {
@@ -112,7 +168,7 @@ const ManageExpense = () => {
     };
 
     return (
-        <div className="container mt-5">
+        <div className="container mt-5" >
             <ToastContainer position="top-right" />
             <div className="text-center mb-4">
                 <h2>
@@ -122,6 +178,35 @@ const ManageExpense = () => {
             </div>
 
             <div>
+
+                <div className="mb-3 d-flex justify-content-center">
+                    <div className="input-group" style={{ maxWidth: "500px" }}>
+                        <input
+                            type="text"
+                            className="form-control me-2"
+                            placeholder="Enter the text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                        <button
+                            className="btn btn-primary me-2"
+                            onClick={() => fetchExpenses(search)}
+                        >
+                            <i className="fas fa-search me-1" /> Search
+                        </button>
+                        <button
+                            className="btn btn-secondary me-3"
+                            onClick={() => {
+                                setSearch("");
+                                fetchExpenses("");
+                            }}
+                        >
+                            <i class="fa-solid fa-xmark"></i>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
                 <table className="table table-striped table-bordered">
                     <thead className="table-dark">
                         <tr>
@@ -169,11 +254,36 @@ const ManageExpense = () => {
                         )}
                     </tbody>
                 </table>
+                {total > 0 && (
+                    <div className="d-flex justify-content-between align-items-center mt-3">
+                        <div>
+                            Showing {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, total)} of {total}
+                        </div>
+
+                        <div>
+                            <button
+                                className="btn btn-sm btn-outline-primary me-2"
+                                onClick={() => { if (page > 1) fetchExpenses(search, page - 1); }}
+                                disabled={page <= 1 || loading}
+                            >
+                                Prev
+                            </button>
+
+                            <button
+                                className="btn btn-sm btn-outline-primary me-2"
+                                onClick={() => { const last = Math.ceil(total / pageSize); if (page < last) fetchExpenses(search, page + 1); }}
+                                disabled={page >= Math.ceil(total / pageSize) || loading}
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {editExpense && (
                 <div className="modal show d-block" tabIndex="-1" role="dialog">
-                    <div className="modal-dialog" role="document">
+                    <div className="modal-dialog modal-dialog-centered" role="document">
                         <div className="modal-content">
                             <div className="modal-header bg-primary text-white">
                                 <h5 className="modal-title">

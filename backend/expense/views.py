@@ -8,6 +8,14 @@ import traceback
 from datetime import datetime
 from django.db.models import Sum
 from django.utils.dateparse import parse_date
+from django.db.models import Q
+from django.utils.dateparse import parse_date
+from django.db.models import Q, Sum, FloatField
+from django.db.models.functions import Cast
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_GET
+from decimal import Decimal, InvalidOperation
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger 
 
 
 @csrf_exempt
@@ -58,18 +66,59 @@ def add_expense(request):
 
 @csrf_exempt
 def manage_expense(request, user_id):
-    if request.method == "GET":
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    q = request.GET.get("q", "").strip()
+
+    try:
+        page = int(request.GET.get("page", 1))
+    except (TypeError, ValueError):
+        page = 1
+
+    try:
+        page_size = int(request.GET.get("page_size", 10))
+    except (TypeError, ValueError):
+        page_size = 10
+
+    try:
+        qs = Expense.objects.filter(UserId_id=user_id).order_by("-ExpenseDate", "-id")
+
+        if q:
+            qs = qs.filter(
+                Q(ExpenseItem__icontains=q) |
+                Q(ExpenseCost__icontains=q) |
+                Q(ExpenseDate__icontains=q)
+            )
+
+        paginator = Paginator(qs, page_size)
+
         try:
-            expenses = Expense.objects.filter(UserId=user_id)  
-            expense_list = list(expenses.values())
-            return JsonResponse(expense_list, safe=False, status=200)
-        except FieldError as e:
-            return JsonResponse({"error": f"Invalid field: {str(e)}"}, status=400)
-        except Exception as e:
-            # log real error in console for debugging
-            print("Error in manage_expense:", e)
-            return JsonResponse({"error": "Server error. Check logs."}, status=500)
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+            page_obj = paginator.page(page)
+        except (EmptyPage, PageNotAnInteger):
+            page_obj = paginator.page(paginator.num_pages)
+
+        results = list(page_obj.object_list.values())
+
+        for r in results:
+            if "ExpenseDate" in r and r["ExpenseDate"]:
+                r["ExpenseDate"] = str(r["ExpenseDate"])[:10]
+
+        return JsonResponse({
+            "results": results,
+            "count": paginator.count,
+            "page": page_obj.number,
+            "page_size": page_size,
+            "num_pages": paginator.num_pages
+        }, safe=False, status=200)
+
+    except FieldError as e:
+        return JsonResponse({"error": f"Invalid field: {str(e)}"}, status=400)
+
+    except Exception as e:
+        print("Error in manage_expense:", e)
+        return JsonResponse({"error": "Server error. Check logs."}, status=500)
+
 
 
 
